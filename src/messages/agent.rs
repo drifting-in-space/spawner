@@ -22,11 +22,13 @@ pub struct DroneLogMessage {
 }
 
 impl DroneLogMessage {
-    #[must_use] pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
         Subject::new(format!("backend.{}.log", backend_id.id()))
     }
 
-    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
         SubscribeSubject::new("backend.*.log".into())
     }
 
@@ -53,6 +55,24 @@ impl DroneLogMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct DroneStatsMessage {
+    pub text: String,
+}
+
+impl DroneStatsMessage {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneStatsMessage, NoReply> {
+        Subject::new(format!("backend.{}.stats", backend_id.id()))
+    }
+
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatsMessage, NoReply> {
+        //what is the point of this exactly?
+        SubscribeSubject::new("backend.*.stats".into())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: String,
@@ -60,11 +80,13 @@ pub struct DroneStatusMessage {
 }
 
 impl DroneStatusMessage {
-    #[must_use] pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
+    #[must_use]
+    pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
         Subject::new(format!("drone.{}.status", drone_id.id()))
     }
 
-    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
         SubscribeSubject::new("drone.*.status".to_string())
     }
 }
@@ -90,7 +112,8 @@ pub enum DroneConnectResponse {
 }
 
 impl DroneConnectRequest {
-    #[must_use] pub fn subject() -> Subject<DroneConnectRequest, DroneConnectResponse> {
+    #[must_use]
+    pub fn subject() -> Subject<DroneConnectRequest, DroneConnectResponse> {
         Subject::new("drone.register".to_string())
     }
 }
@@ -121,7 +144,8 @@ pub struct SpawnRequest {
 }
 
 impl SpawnRequest {
-    #[must_use] pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
+    #[must_use]
+    pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
         Subject::new(format!("drone.{}.spawn", drone_id.id()))
     }
 }
@@ -197,7 +221,8 @@ impl ToString for BackendState {
 
 impl BackendState {
     /// true if the state is a final state of a backend that can not change.
-    #[must_use] pub fn terminal(self) -> bool {
+    #[must_use]
+    pub fn terminal(self) -> bool {
         matches!(
             self,
             BackendState::ErrorLoading
@@ -210,7 +235,8 @@ impl BackendState {
     }
 
     /// true if the state implies that the container is running.
-    #[must_use] pub fn running(self) -> bool {
+    #[must_use]
+    pub fn running(self) -> bool {
         matches!(self, BackendState::Starting | BackendState::Ready)
     }
 }
@@ -227,18 +253,21 @@ pub struct BackendStateMessage {
 
 impl BackendStateMessage {
     /// Construct a status message using the current time as its timestamp.
-    #[must_use] pub fn new(state: BackendState) -> Self {
+    #[must_use]
+    pub fn new(state: BackendState) -> Self {
         BackendStateMessage {
             state,
             time: Utc::now(),
         }
     }
 
-    #[must_use] pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
         Subject::new(format!("backend.{}.status", backend_id.id()))
     }
 
-    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
         SubscribeSubject::new("backend.*.status".to_string())
     }
 }
