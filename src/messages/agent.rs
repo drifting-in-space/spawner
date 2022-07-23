@@ -2,7 +2,7 @@ use crate::{
     nats::{NoReply, Subject, SubscribeSubject},
     types::{BackendId, DroneId},
 };
-use bollard::{auth::DockerCredentials, container::LogOutput};
+use bollard::{auth::DockerCredentials, container::LogOutput, container::Stats};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -22,11 +22,13 @@ pub struct DroneLogMessage {
 }
 
 impl DroneLogMessage {
-    #[must_use] pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneLogMessage, NoReply> {
         Subject::new(format!("backend.{}.log", backend_id.id()))
     }
 
-    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneLogMessage, NoReply> {
         SubscribeSubject::new("backend.*.log".into())
     }
 
@@ -53,6 +55,53 @@ impl DroneLogMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct DroneStatsMessage {
+    //just fractions of max for now,  go from there
+    pub cpu_used: String,
+    pub mem_used: String,
+    pub disk_used: String,
+}
+
+impl DroneStatsMessage {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<DroneStatsMessage, NoReply> {
+        Subject::new(format!("backend.{}.stats", backend_id.id()))
+    }
+
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatsMessage, NoReply> {
+        //what is the point of this exactly?
+        SubscribeSubject::new("backend.*.stats".into())
+    }
+
+    pub fn from_stats_message(stats_message: &Stats) -> Option<DroneStatsMessage> {
+        let mem_use = stats_message.memory_stats.usage.unwrap_or(0)
+            / stats_message.memory_stats.limit.unwrap_or(0);
+        let cpu_use = (stats_message.cpu_stats.cpu_usage.total_usage
+            / stats_message.cpu_stats.system_cpu_usage.unwrap_or(1))
+            * stats_message.cpu_stats.online_cpus.unwrap_or(1);
+        const MAX_BYTES: u64 = 1_000_000_000;
+
+        let blkio_stats = stats_message.blkio_stats.clone();
+        let bytes_used = match blkio_stats.io_service_bytes_recursive {
+            Some(blk) => match blk.get(0) {
+                Some(v) => v.value,
+                None => 0,
+            },
+            None => 0,
+        };
+
+        let disk_use = bytes_used / MAX_BYTES;
+
+        return Some(DroneStatsMessage {
+            cpu_used: cpu_use.to_string(),
+            mem_used: mem_use.to_string(),
+            disk_used: disk_use.to_string(),
+        });
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DroneStatusMessage {
     pub drone_id: DroneId,
     pub cluster: String,
@@ -60,11 +109,13 @@ pub struct DroneStatusMessage {
 }
 
 impl DroneStatusMessage {
-    #[must_use] pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
+    #[must_use]
+    pub fn subject(drone_id: &DroneId) -> Subject<DroneStatusMessage, NoReply> {
         Subject::new(format!("drone.{}.status", drone_id.id()))
     }
 
-    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<DroneStatusMessage, bool> {
         SubscribeSubject::new("drone.*.status".to_string())
     }
 }
@@ -90,7 +141,8 @@ pub enum DroneConnectResponse {
 }
 
 impl DroneConnectRequest {
-    #[must_use] pub fn subject() -> Subject<DroneConnectRequest, DroneConnectResponse> {
+    #[must_use]
+    pub fn subject() -> Subject<DroneConnectRequest, DroneConnectResponse> {
         Subject::new("drone.register".to_string())
     }
 }
@@ -121,7 +173,8 @@ pub struct SpawnRequest {
 }
 
 impl SpawnRequest {
-    #[must_use] pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
+    #[must_use]
+    pub fn subject(drone_id: DroneId) -> Subject<SpawnRequest, bool> {
         Subject::new(format!("drone.{}.spawn", drone_id.id()))
     }
 }
@@ -197,7 +250,8 @@ impl ToString for BackendState {
 
 impl BackendState {
     /// true if the state is a final state of a backend that can not change.
-    #[must_use] pub fn terminal(self) -> bool {
+    #[must_use]
+    pub fn terminal(self) -> bool {
         matches!(
             self,
             BackendState::ErrorLoading
@@ -210,7 +264,8 @@ impl BackendState {
     }
 
     /// true if the state implies that the container is running.
-    #[must_use] pub fn running(self) -> bool {
+    #[must_use]
+    pub fn running(self) -> bool {
         matches!(self, BackendState::Starting | BackendState::Ready)
     }
 }
@@ -227,18 +282,21 @@ pub struct BackendStateMessage {
 
 impl BackendStateMessage {
     /// Construct a status message using the current time as its timestamp.
-    #[must_use] pub fn new(state: BackendState) -> Self {
+    #[must_use]
+    pub fn new(state: BackendState) -> Self {
         BackendStateMessage {
             state,
             time: Utc::now(),
         }
     }
 
-    #[must_use] pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
+    #[must_use]
+    pub fn subject(backend_id: &BackendId) -> Subject<BackendStateMessage, NoReply> {
         Subject::new(format!("backend.{}.status", backend_id.id()))
     }
 
-    #[must_use] pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
+    #[must_use]
+    pub fn subscribe_subject() -> SubscribeSubject<BackendStateMessage, NoReply> {
         SubscribeSubject::new("backend.*.status".to_string())
     }
 }
